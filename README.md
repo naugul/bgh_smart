@@ -8,13 +8,16 @@ Integración personalizada para controlar aires acondicionados BGH Smart vía UD
 - Encendido/Apagado
 - Modos: Frío, Calor, Ventilación, Dry, Auto
 - Velocidad del ventilador: Baja, Media, Alta
-- **Seteo de temperatura objetivo** ✨
+- Seteo de temperatura objetivo
 - Lectura de temperatura ambiente
 - Lectura de temperatura objetivo (setpoint)
 
 ✅ Comunicación 100% local vía UDP (no requiere cloud)
+
 ✅ Recepción de broadcasts en tiempo real
-✅ Configuración vía UI (no requiere editar YAML)
+
+✅ Configuración vía UI (no requiere editar YAML) con la IP del equipo
+
 ✅ Soporte para múltiples equipos
 
 ## Requisitos
@@ -22,6 +25,8 @@ Integración personalizada para controlar aires acondicionados BGH Smart vía UD
 - Home Assistant 2023.1 o superior
 - Aire acondicionado BGH Smart con control IP/WiFi
 - IP fija configurada en tu router para cada equipo
+
+NOTA: No se por el momento si funciona con el BGH Smart Control Kit (el pequeño dispositivo smart que se conecta con aires acondicionados de cualquier marca). Esto está probado con los equipos BGH.
 
 ## Instalación
 
@@ -31,7 +36,7 @@ Integración personalizada para controlar aires acondicionados BGH Smart vía UD
 2. Ve a "Integraciones"
 3. Haz clic en los tres puntos (⋮) arriba a la derecha
 4. Selecciona "Repositorios personalizados"
-5. Agrega esta URL: `https://github.com/user/bgh_smart`
+5. Agrega esta URL: `https://github.com/firtman/bgh_smart`
 6. Categoría: `Integration`
 7. Busca "BGH Smart Control" y descárgala
 8. Reinicia Home Assistant
