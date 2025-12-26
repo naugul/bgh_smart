@@ -290,7 +290,7 @@ class BGHClient:
 
     def _parse_status(self, data: bytes) -> dict[str, Any]:
         """Parse status response."""
-        if len(data) < 25:
+        if len(data) < 22:
             _LOGGER.warning("Invalid status data length: %d", len(data))
             return {}
 
