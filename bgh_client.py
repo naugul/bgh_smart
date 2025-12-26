@@ -112,7 +112,7 @@ class BGHClient:
                 try:
                     data, addr = await asyncio.wait_for(
                         loop.sock_recvfrom(self._recv_sock, 1024),
-                        timeout=15.0  # 15 second timeout
+                        timeout=60.0  # 15 second timeout
                     )
                     
                     _LOGGER.debug("📡 Received UDP packet from %s: %d bytes", addr, len(data))
@@ -290,7 +290,7 @@ class BGHClient:
 
     def _parse_status(self, data: bytes) -> dict[str, Any]:
         """Parse status response."""
-        if len(data) < 22:
+        if len(data) < 25:
             _LOGGER.warning("Invalid status data length: %d", len(data))
             return {}
 
