@@ -13,7 +13,7 @@ UDP_SOURCE_PORT = 54563  # Puerto origen requerido por protocolo BGH
 
 # Update interval (seconds) - Backup polling when broadcasts don't work
 # The broadcast listener will handle most updates in real-time
-UPDATE_INTERVAL = 5
+UPDATE_INTERVAL = 60
 
 # BGH Protocol Commands (hex)
 CMD_STATUS = "00000000000000accf23aa3190590001e4"
