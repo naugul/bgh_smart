@@ -112,7 +112,7 @@ class BGHClient:
                 try:
                     data, addr = await asyncio.wait_for(
                         loop.sock_recvfrom(self._recv_sock, 1024),
-                        timeout=60.0  # 15 second timeout
+                        timeout=15.0  # 15 second timeout
                     )
                     
                     _LOGGER.debug("📡 Received UDP packet from %s: %d bytes", addr, len(data))
