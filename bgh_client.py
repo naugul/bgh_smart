@@ -294,23 +294,27 @@ class BGHClient:
             _LOGGER.warning("Invalid status data length: %d (minimum 22)", len(data))
             return {}
 
-        _LOGGER.debug("Parsing status data (%d bytes): %s", len(data), data.hex())
+        _LOGGER.info("📊 Parsing status data (%d bytes): %s", len(data), data.hex())
+        
+        # Ignore short broadcasts - they don't contain valid status
+        if len(data) < 25:
+            _LOGGER.debug("Ignoring short broadcast (22 bytes) - waiting for full status")
+            return {}
 
         # Extract data according to Node-RED flow
-        mode = data[18] if len(data) > 18 else 0
-        fan_speed = data[19] if len(data) > 19 else 1
+        mode = data[18]
+        fan_speed = data[19]
         
         # Temperature is in bytes 21-22 (little-endian, divided by 100)
-        current_temp = 0.0
-        if len(data) >= 23:
-            temp_raw = struct.unpack("<H", data[21:23])[0]
-            current_temp = temp_raw / 100.0
+        temp_raw = struct.unpack("<H", data[21:23])[0]
+        current_temp = temp_raw / 100.0
         
-        # Setpoint is in bytes 23-24 (only in full status responses)
-        target_temp = 0.0
-        if len(data) >= 25:
-            setpoint_raw = struct.unpack("<H", data[23:25])[0]
-            target_temp = setpoint_raw / 100.0
+        # Setpoint is in bytes 23-24
+        setpoint_raw = struct.unpack("<H", data[23:25])[0]
+        target_temp = setpoint_raw / 100.0
+        
+        _LOGGER.info("   Mode: %d, Fan: %d, Current: %.1f°C, Target: %.1f°C", 
+                    mode, fan_speed, current_temp, target_temp)
 
         status = {
             "mode": MODES.get(mode, "unknown"),
