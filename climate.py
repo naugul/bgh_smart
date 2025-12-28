@@ -92,36 +92,85 @@ class BGHClimate(CoordinatorEntity[BGHDataUpdateCoordinator], ClimateEntity):
             "model": "Smart Control",
         }
         self._enable_turn_on_off_backwards_compatibility = False
+        
+        # Store last known good values
+        self._last_valid_current_temp: float | None = None
+        self._last_valid_target_temp: float | None = None
+        self._last_valid_mode: str = "off"
+        self._last_valid_fan: int = 1
+
+    def _is_valid_temperature(self, temp: float | None) -> bool:
+        """Check if temperature is within reasonable range."""
+        if temp is None:
+            return False
+        # Reasonable AC temperature range: 10°C to 40°C
+        # Adjust these limits based on your climate
+        return 10.0 <= temp <= 40.0
+
+    def _validate_and_store_data(self) -> None:
+        """Validate coordinator data and store good values."""
+        if not self.coordinator.data:
+            _LOGGER.debug("No coordinator data available")
+            return
+        
+        current_temp = self.coordinator.data.get("current_temperature")
+        target_temp = self.coordinator.data.get("target_temperature")
+        mode = self.coordinator.data.get("mode", "off")
+        fan_speed = self.coordinator.data.get("fan_speed", 1)
+        
+        # Log the raw data for debugging
+        _LOGGER.debug("Raw data: current=%.1f, target=%.1f, mode=%s, fan=%d",
+                     current_temp if current_temp else 0,
+                     target_temp if target_temp else 0,
+                     mode, fan_speed)
+        
+        # Validate and store current temperature
+        if self._is_valid_temperature(current_temp):
+            if self._last_valid_current_temp is None or abs(current_temp - self._last_valid_current_temp) < 10:
+                # Accept if first reading or change is less than 10°C
+                self._last_valid_current_temp = current_temp
+            else:
+                _LOGGER.warning("Rejecting invalid current temp: %.1f (last valid: %.1f)",
+                              current_temp, self._last_valid_current_temp)
+        
+        # Validate and store target temperature
+        if self._is_valid_temperature(target_temp):
+            if self._last_valid_target_temp is None or abs(target_temp - self._last_valid_target_temp) < 10:
+                self._last_valid_target_temp = target_temp
+            else:
+                _LOGGER.warning("Rejecting invalid target temp: %.1f (last valid: %.1f)",
+                              target_temp, self._last_valid_target_temp)
+        
+        # Store mode and fan (these are less likely to be corrupted)
+        if mode in HVAC_MODE_MAP:
+            self._last_valid_mode = mode
+        
+        if 0 <= fan_speed <= 5:  # Adjust range based on your AC
+            self._last_valid_fan = fan_speed
 
     @property
     def current_temperature(self) -> float | None:
         """Return the current temperature."""
-        if self.coordinator.data:
-            return self.coordinator.data.get("current_temperature")
-        return None
+        self._validate_and_store_data()
+        return self._last_valid_current_temp
 
     @property
     def target_temperature(self) -> float | None:
         """Return the temperature we try to reach."""
-        if self.coordinator.data:
-            return self.coordinator.data.get("target_temperature")
-        return None
+        self._validate_and_store_data()
+        return self._last_valid_target_temp
 
     @property
     def hvac_mode(self) -> HVACMode:
         """Return current operation mode."""
-        if self.coordinator.data:
-            mode = self.coordinator.data.get("mode", "off")
-            return HVAC_MODE_MAP.get(mode, HVACMode.OFF)
-        return HVACMode.OFF
+        self._validate_and_store_data()
+        return HVAC_MODE_MAP.get(self._last_valid_mode, HVACMode.OFF)
 
     @property
     def fan_mode(self) -> str | None:
         """Return the fan setting."""
-        if self.coordinator.data:
-            fan_speed = self.coordinator.data.get("fan_speed", 1)
-            return FAN_MODES.get(fan_speed, "low")
-        return None
+        self._validate_and_store_data()
+        return FAN_MODES.get(self._last_valid_fan, "low")
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperature."""
@@ -145,9 +194,7 @@ class BGHClimate(CoordinatorEntity[BGHDataUpdateCoordinator], ClimateEntity):
             return
 
         # Keep current fan speed if available
-        current_fan = None
-        if self.coordinator.data:
-            current_fan = self.coordinator.data.get("fan_speed")
+        current_fan = self._last_valid_fan
 
         await self.coordinator.async_set_mode(mode_value, current_fan)
 
@@ -159,9 +206,7 @@ class BGHClimate(CoordinatorEntity[BGHDataUpdateCoordinator], ClimateEntity):
             return
 
         # Keep current mode
-        current_mode = None
-        if self.coordinator.data:
-            current_mode = self.coordinator.data.get("mode_raw", 0)
+        current_mode = MODES_REVERSE.get(self._last_valid_mode, 0)
 
         await self.coordinator.async_set_mode(current_mode, fan_value)
 
