@@ -103,9 +103,9 @@ class BGHClimate(CoordinatorEntity[BGHDataUpdateCoordinator], ClimateEntity):
         """Check if temperature is within reasonable range."""
         if temp is None:
             return False
-        # Reasonable AC temperature range: 16°C to 32°C
+        # Reasonable AC temperature range: 10°C to 40°C
         # Adjust these limits based on your climate
-        return 16.0 <= temp <= 32.0
+        return 10.0 <= temp <= 40.0
 
     def _validate_and_store_data(self) -> None:
         """Validate coordinator data and store good values."""
@@ -126,8 +126,8 @@ class BGHClimate(CoordinatorEntity[BGHDataUpdateCoordinator], ClimateEntity):
         
         # Validate and store current temperature
         if self._is_valid_temperature(current_temp):
-            if self._last_valid_current_temp is None or abs(current_temp - self._last_valid_current_temp) < 16:
-                # Accept if first reading or change is less than 16°C
+            if self._last_valid_current_temp is None or abs(current_temp - self._last_valid_current_temp) < 10:
+                # Accept if first reading or change is less than 10°C
                 self._last_valid_current_temp = current_temp
             else:
                 _LOGGER.warning("Rejecting invalid current temp: %.1f (last valid: %.1f)",
@@ -135,15 +135,40 @@ class BGHClimate(CoordinatorEntity[BGHDataUpdateCoordinator], ClimateEntity):
         
         # Validate and store target temperature
         if self._is_valid_temperature(target_temp):
-            if self._last_valid_target_temp is None or abs(target_temp - self._last_valid_target_temp) < 16:
+            if self._last_valid_target_temp is None or abs(target_temp - self._last_valid_target_temp) < 10:
                 self._last_valid_target_temp = target_temp
             else:
                 _LOGGER.warning("Rejecting invalid target temp: %.1f (last valid: %.1f)",
                               target_temp, self._last_valid_target_temp)
         
-        # Store mode and fan (these are less likely to be corrupted)
+        # Store mode - but be cautious about changes
         if mode in HVAC_MODE_MAP:
-            self._last_valid_mode = mode
+            # If mode changes, require it to be consistent for multiple updates
+            if not hasattr(self, '_pending_mode'):
+                self._pending_mode = None
+                self._pending_mode_count = 0
+            
+            if mode != self._last_valid_mode:
+                # Mode is different - is it the same as last pending?
+                if mode == self._pending_mode:
+                    self._pending_mode_count += 1
+                    _LOGGER.debug("Mode change pending: %s->%s (count: %d)", 
+                                 self._last_valid_mode, mode, self._pending_mode_count)
+                    # Only accept after 2 consistent readings
+                    if self._pending_mode_count >= 2:
+                        _LOGGER.info("Mode change confirmed: %s -> %s", 
+                                    self._last_valid_mode, mode)
+                        self._last_valid_mode = mode
+                        self._pending_mode = None
+                        self._pending_mode_count = 0
+                else:
+                    # New different mode - start counting
+                    self._pending_mode = mode
+                    self._pending_mode_count = 1
+            else:
+                # Mode matches current - reset pending
+                self._pending_mode = None
+                self._pending_mode_count = 0
         
         if 0 <= fan_speed <= 5:  # Adjust range based on your AC
             self._last_valid_fan = fan_speed
