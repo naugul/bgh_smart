@@ -126,8 +126,8 @@ class BGHClimate(CoordinatorEntity[BGHDataUpdateCoordinator], ClimateEntity):
         
         # Validate and store current temperature
         if self._is_valid_temperature(current_temp):
-            if self._last_valid_current_temp is None or abs(current_temp - self._last_valid_current_temp) < 10:
-                # Accept if first reading or change is less than 10°C
+            if self._last_valid_current_temp is None or abs(current_temp - self._last_valid_current_temp) < 20:
+                # Accept if first reading or change is less than 20°C
                 self._last_valid_current_temp = current_temp
             else:
                 _LOGGER.warning("Rejecting invalid current temp: %.1f (last valid: %.1f)",
@@ -135,7 +135,7 @@ class BGHClimate(CoordinatorEntity[BGHDataUpdateCoordinator], ClimateEntity):
         
         # Validate and store target temperature
         if self._is_valid_temperature(target_temp):
-            if self._last_valid_target_temp is None or abs(target_temp - self._last_valid_target_temp) < 10:
+            if self._last_valid_target_temp is None or abs(target_temp - self._last_valid_target_temp) < 20:
                 self._last_valid_target_temp = target_temp
             else:
                 _LOGGER.warning("Rejecting invalid target temp: %.1f (last valid: %.1f)",
