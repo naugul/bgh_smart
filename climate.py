@@ -103,9 +103,9 @@ class BGHClimate(CoordinatorEntity[BGHDataUpdateCoordinator], ClimateEntity):
         """Check if temperature is within reasonable range."""
         if temp is None:
             return False
-        # Reasonable AC temperature range: 10°C to 40°C
+        # Reasonable AC temperature range: 16°C to 32°C
         # Adjust these limits based on your climate
-        return 10.0 <= temp <= 40.0
+        return 16.0 <= temp <= 32.0
 
     def _validate_and_store_data(self) -> None:
         """Validate coordinator data and store good values."""
