@@ -103,9 +103,8 @@ class BGHClimate(CoordinatorEntity[BGHDataUpdateCoordinator], ClimateEntity):
         """Check if temperature is within reasonable range."""
         if temp is None:
             return False
-        # Reasonable AC temperature range: 10°C to 40°C
-        # Adjust these limits based on your climate
-        return 10.0 <= temp <= 40.0
+        # Reasonable AC temperature range
+        return 16.0 <= temp <= 32.0
 
     def _validate_and_store_data(self) -> None:
         """Validate coordinator data and store good values."""
@@ -124,54 +123,41 @@ class BGHClimate(CoordinatorEntity[BGHDataUpdateCoordinator], ClimateEntity):
                      target_temp if target_temp else 0,
                      mode, fan_speed)
         
+        # Validate temperatures
+        current_temp_valid = False
+        target_temp_valid = False
+        
         # Validate and store current temperature
         if self._is_valid_temperature(current_temp):
-            if self._last_valid_current_temp is None or abs(current_temp - self._last_valid_current_temp) < 10:
-                # Accept if first reading or change is less than 10°C
+            if self._last_valid_current_temp is None or abs(current_temp - self._last_valid_current_temp) < 16:
                 self._last_valid_current_temp = current_temp
+                current_temp_valid = True
             else:
                 _LOGGER.warning("Rejecting invalid current temp: %.1f (last valid: %.1f)",
                               current_temp, self._last_valid_current_temp)
         
         # Validate and store target temperature
         if self._is_valid_temperature(target_temp):
-            if self._last_valid_target_temp is None or abs(target_temp - self._last_valid_target_temp) < 10:
+            if self._last_valid_target_temp is None or abs(target_temp - self._last_valid_target_temp) < 16:
                 self._last_valid_target_temp = target_temp
+                target_temp_valid = True
             else:
                 _LOGGER.warning("Rejecting invalid target temp: %.1f (last valid: %.1f)",
                               target_temp, self._last_valid_target_temp)
         
-        # Store mode - but be cautious about changes
-        if mode in HVAC_MODE_MAP:
-            # If mode changes, require it to be consistent for multiple updates
-            if not hasattr(self, '_pending_mode'):
-                self._pending_mode = None
-                self._pending_mode_count = 0
+        # Only update mode/fan if at least one temperature is valid
+        # If both temps are bad, the whole packet is corrupted - don't trust it
+        if current_temp_valid or target_temp_valid:
+            # Temperature data is good, trust mode and fan too
+            if mode in HVAC_MODE_MAP:
+                self._last_valid_mode = mode
             
-            if mode != self._last_valid_mode:
-                # Mode is different - is it the same as last pending?
-                if mode == self._pending_mode:
-                    self._pending_mode_count += 1
-                    _LOGGER.debug("Mode change pending: %s->%s (count: %d)", 
-                                 self._last_valid_mode, mode, self._pending_mode_count)
-                    # Only accept after 2 consistent readings
-                    if self._pending_mode_count >= 2:
-                        _LOGGER.info("Mode change confirmed: %s -> %s", 
-                                    self._last_valid_mode, mode)
-                        self._last_valid_mode = mode
-                        self._pending_mode = None
-                        self._pending_mode_count = 0
-                else:
-                    # New different mode - start counting
-                    self._pending_mode = mode
-                    self._pending_mode_count = 1
-            else:
-                # Mode matches current - reset pending
-                self._pending_mode = None
-                self._pending_mode_count = 0
-        
-        if 0 <= fan_speed <= 5:  # Adjust range based on your AC
-            self._last_valid_fan = fan_speed
+            if 0 <= fan_speed <= 5:
+                self._last_valid_fan = fan_speed
+        else:
+            # Both temperatures failed validation - reject everything
+            _LOGGER.warning("Rejecting mode/fan data due to invalid temperatures (ignoring mode=%s, fan=%d)",
+                          mode, fan_speed)
 
     @property
     def current_temperature(self) -> float | None:
@@ -219,7 +205,9 @@ class BGHClimate(CoordinatorEntity[BGHDataUpdateCoordinator], ClimateEntity):
             return
 
         # Keep current fan speed if available
-        current_fan = self._last_valid_fan
+        current_fan = None
+        if self.coordinator.data:
+            current_fan = self.coordinator.data.get("fan_speed")
 
         await self.coordinator.async_set_mode(mode_value, current_fan)
 
@@ -231,7 +219,9 @@ class BGHClimate(CoordinatorEntity[BGHDataUpdateCoordinator], ClimateEntity):
             return
 
         # Keep current mode
-        current_mode = MODES_REVERSE.get(self._last_valid_mode, 0)
+        current_mode = None
+        if self.coordinator.data:
+            current_mode = self.coordinator.data.get("mode_raw", 0)
 
         await self.coordinator.async_set_mode(current_mode, fan_value)
 
